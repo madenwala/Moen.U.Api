@@ -18,9 +18,9 @@ namespace Moen.U.Api
 
         #region Constructors
 
-        public ClientBase(string baseURL = null)
+        public ClientBase(string baseUrl = null)
         {
-            this.SetBaseUrl(baseURL);
+            this.SetBaseUrl(baseUrl);
             this.Client = new HttpClient();
         }
 
@@ -34,12 +34,20 @@ namespace Moen.U.Api
 
         #region Methods
 
-        protected void SetBaseUrl(string urlString)
+        protected void SetBaseUrl(string baseUrl)
         {
-            if (string.IsNullOrWhiteSpace(urlString))
+            if (string.IsNullOrWhiteSpace(baseUrl))
                 this.BaseUri = null;
             else
-                this.BaseUri = new Uri(urlString);
+                this.BaseUri = new Uri(baseUrl);
+        }
+
+        protected Uri GetRequestUri(string url)
+        {
+            if (string.IsNullOrEmpty(url))
+                throw new ArgumentNullException(nameof(url));
+
+            return this.BaseUri != null ? new Uri(this.BaseUri, url) : new Uri(url);
         }
 
         #region Get
@@ -62,12 +70,9 @@ namespace Moen.U.Api
             }
         }
 
-        protected async Task<HttpResponseMessage> GetAsync(string url, CancellationToken ct)
+        private async Task<HttpResponseMessage> GetAsync(string url, CancellationToken ct)
         {
-            if (string.IsNullOrEmpty(url))
-                throw new ArgumentNullException(nameof(url));
-
-            return await this.Client.GetAsync(new Uri(this.BaseUri, url), ct);
+            return await this.Client.GetAsync(this.GetRequestUri(url), ct);
         }
 
         #endregion
@@ -101,13 +106,30 @@ namespace Moen.U.Api
         /// <returns><see cref="HttpResponseMessage"/> returned from post.</returns>
         protected async Task<HttpResponseMessage> PostAsync(string url, CancellationToken ct, HttpContent contents = default(HttpContent))
         {
-            if (string.IsNullOrEmpty(url))
-                throw new ArgumentNullException(nameof(url));
-
-            return await this.Client.PostAsync(new Uri(this.BaseUri, url), contents, ct);
+            return await this.Client.PostAsync(this.GetRequestUri(url), contents, ct);
         }
 
         #endregion
+
+        #region Patch
+
+        protected async Task<T> PatchAsync<T>(string url, CancellationToken ct, HttpContent contents = default(HttpContent))
+        {
+            using (var response = await this.PatchAsync(url, ct, contents))
+            {
+                response.EnsureSuccessStatusCode();
+                return await response.ContentToAsync<T>();
+            }
+        }
+
+        protected async Task<HttpResponseMessage> PatchAsync(string url, CancellationToken ct, HttpContent contents)
+        {
+            var request = new HttpRequestMessage(new HttpMethod("PATCH"), this.GetRequestUri(url));
+            request.Content = contents;
+            return await this.Client.SendAsync(request, ct);
+        }
+
+        #endregion Patch
 
         #endregion
     }
