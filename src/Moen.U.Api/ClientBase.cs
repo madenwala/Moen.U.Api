@@ -84,13 +84,13 @@ namespace Moen.U.Api
         /// </summary>
         /// <typeparam name="T">Type for the strongly typed class representing data returned from the URL.</typeparam>
         /// <param name="url">URL to retrieve data from.</param>
-        /// <param name="contents">Any content that should be passed into the post.</param>
+        /// <param name="content">Any content that should be passed into the post.</param>
         /// <param name="ct">Cancellation token.</param>
         /// <param name="serializerType">Specifies how the data should be deserialized.</param>
         /// <returns>Instance of the type specified representing the data returned from the URL.</returns>
-        protected async Task<T> PostAsync<T>(string url, CancellationToken ct, HttpContent contents = default(HttpContent))
+        protected async Task<T> PostAsync<T>(string url, CancellationToken ct, HttpContent content = default(HttpContent))
         {
-            using (var response = await this.PostAsync(url, ct, contents))
+            using (var response = await this.PostAsync(url, ct, content))
             {
                 response.EnsureSuccessStatusCode();
                 return await response.ContentToAsync<T>();
@@ -102,11 +102,11 @@ namespace Moen.U.Api
         /// </summary>
         /// <param name="url">URL to post data to.</param>
         /// <param name="ct">Cancellation token.</param>
-        /// <param name="contents">Any content that should be passed into the post.</param>
+        /// <param name="content">Any content that should be passed into the post.</param>
         /// <returns><see cref="HttpResponseMessage"/> returned from post.</returns>
-        protected async Task<HttpResponseMessage> PostAsync(string url, CancellationToken ct, HttpContent contents = default(HttpContent))
+        protected async Task<HttpResponseMessage> PostAsync(string url, CancellationToken ct, HttpContent content = default(HttpContent))
         {
-            return await this.Client.PostAsync(this.GetRequestUri(url), contents, ct);
+            return await this.Client.PostAsync(this.GetRequestUri(url), content, ct);
         }
 
         #endregion
@@ -122,10 +122,15 @@ namespace Moen.U.Api
             }
         }
 
-        protected async Task<HttpResponseMessage> PatchAsync(string url, CancellationToken ct, HttpContent contents)
+        protected async Task<HttpResponseMessage> PatchAsync(string url, CancellationToken ct, HttpContent content)
         {
-            var request = new HttpRequestMessage(new HttpMethod("PATCH"), this.GetRequestUri(url));
-            request.Content = contents;
+            if (content == null)
+                throw new ArgumentNullException(nameof(content));
+
+            var request = new HttpRequestMessage(new HttpMethod("PATCH"), this.GetRequestUri(url))
+            {
+                Content = content
+            };
             return await this.Client.SendAsync(request, ct);
         }
 
