@@ -1,5 +1,6 @@
 ﻿using Moen.U.Api.Extensions;
 using System;
+using System.Diagnostics;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
@@ -42,7 +43,7 @@ namespace Moen.U.Api
                 this.BaseUri = new Uri(baseUrl);
         }
 
-        protected Uri GetRequestUri(string url)
+        private Uri GetRequestUri(string url)
         {
             if (string.IsNullOrEmpty(url))
                 throw new ArgumentNullException(nameof(url));
@@ -72,7 +73,9 @@ namespace Moen.U.Api
 
         private async Task<HttpResponseMessage> GetAsync(string url, CancellationToken ct)
         {
-            return await this.Client.GetAsync(this.GetRequestUri(url), ct);
+            var response = await this.Client.GetAsync(this.GetRequestUri(url), ct);
+            await this.LogAsync(response);
+            return response;
         }
 
         #endregion
@@ -86,12 +89,12 @@ namespace Moen.U.Api
         /// <param name="url">URL to retrieve data from.</param>
         /// <param name="content">Any content that should be passed into the post.</param>
         /// <param name="ct">Cancellation token.</param>
-        /// <param name="serializerType">Specifies how the data should be deserialized.</param>
         /// <returns>Instance of the type specified representing the data returned from the URL.</returns>
-        protected async Task<T> PostAsync<T>(string url, CancellationToken ct, HttpContent content = default(HttpContent))
+        protected async Task<T> PostAsync<T>(string url, CancellationToken ct, HttpContent content = null)
         {
             using (var response = await this.PostAsync(url, ct, content))
             {
+                await this.LogAsync(response);
                 response.EnsureSuccessStatusCode();
                 return await response.ContentToAsync<T>();
             }
@@ -104,37 +107,88 @@ namespace Moen.U.Api
         /// <param name="ct">Cancellation token.</param>
         /// <param name="content">Any content that should be passed into the post.</param>
         /// <returns><see cref="HttpResponseMessage"/> returned from post.</returns>
-        protected async Task<HttpResponseMessage> PostAsync(string url, CancellationToken ct, HttpContent content = default(HttpContent))
+        protected async Task<HttpResponseMessage> PostAsync(string url, CancellationToken ct, HttpContent content = null)
         {
-            return await this.Client.PostAsync(this.GetRequestUri(url), content, ct);
+            var response = await this.Client.PostAsync(this.GetRequestUri(url), content, ct);
+            await this.LogAsync(response);
+            return response;
+        }
+
+        #endregion
+
+        #region Delete
+
+        /// <summary>
+        /// Posts data to the specified URL.
+        /// </summary>
+        /// <typeparam name="T">Type for the strongly typed class representing data returned from the URL.</typeparam>
+        /// <param name="url">URL to retrieve data from.</param>
+        /// <param name="content">Any content that should be passed into the post.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Instance of the type specified representing the data returned from the URL.</returns>
+        protected async Task<T> DeleteAsync<T>(string url, CancellationToken ct)
+        {
+            using (var response = await this.DeleteAsync(url, ct))
+            {
+                await this.LogAsync(response);
+                response.EnsureSuccessStatusCode();
+                return await response.ContentToAsync<T>();
+            }
+        }
+
+        /// <summary>
+        /// Delete to specified URL.
+        /// </summary>
+        /// <param name="url">URL to post data to.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <param name="content">Any content that should be passed into the post.</param>
+        /// <returns><see cref="HttpResponseMessage"/> returned from post.</returns>
+        protected async Task<HttpResponseMessage> DeleteAsync(string url, CancellationToken ct)
+        {
+            var response = await this.Client.DeleteAsync(this.GetRequestUri(url), ct);
+            await this.LogAsync(response);
+            return response;
         }
 
         #endregion
 
         #region Patch
 
-        protected async Task<T> PatchAsync<T>(string url, CancellationToken ct, HttpContent contents = default(HttpContent))
+        protected async Task<T> PatchAsync<T>(string url, CancellationToken ct, HttpContent contents = null)
         {
             using (var response = await this.PatchAsync(url, ct, contents))
             {
+                await this.LogAsync(response);
                 response.EnsureSuccessStatusCode();
                 return await response.ContentToAsync<T>();
             }
         }
 
-        protected async Task<HttpResponseMessage> PatchAsync(string url, CancellationToken ct, HttpContent content)
+        protected async Task<HttpResponseMessage> PatchAsync(string url, CancellationToken ct, HttpContent content = null)
         {
-            if (content == null)
-                throw new ArgumentNullException(nameof(content));
+            var request = new HttpRequestMessage(new HttpMethod("PATCH"), this.GetRequestUri(url));
+            if (content != null)
+                request.Content = content;
 
-            var request = new HttpRequestMessage(new HttpMethod("PATCH"), this.GetRequestUri(url))
-            {
-                Content = content
-            };
-            return await this.Client.SendAsync(request, ct);
+            var response = await this.Client.SendAsync(request, ct);
+            await this.LogAsync(response);
+            return response;
         }
 
-        #endregion Patch
+        #endregion
+
+        private async Task LogAsync(HttpResponseMessage response)
+        {
+            var data = await response.Content?.ReadAsStringAsync();
+            Debug.WriteLine("********");
+            Debug.WriteLine($"REQUEST   URL: {response.RequestMessage.RequestUri}");
+            if(response.RequestMessage.Content != null)
+                Debug.WriteLine($"REQUEST   Content: {await response.RequestMessage.Content?.ReadAsStringAsync()}");
+            Debug.WriteLine($"RESPONSE  Code: {(int)response.StatusCode} ({response.StatusCode})");
+            if(!string.IsNullOrEmpty(data))
+                Debug.WriteLine($"{data}");
+            Debug.WriteLine("********");
+        }
 
         #endregion
     }

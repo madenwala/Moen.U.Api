@@ -1,4 +1,6 @@
-﻿namespace Moen.U.Api.Models
+﻿using Newtonsoft.Json;
+
+namespace Moen.U.Api.Models
 {
     public sealed class ShowerDetails
     {
@@ -32,20 +34,13 @@
         public int timezone_offset { get; set; }
         public string token { get; set; }
         public Capability[] capabilities { get; set; }
-        public Outlet[] outlets { get; set; }
+        public OutletIcon[] outlets { get; set; }
         public Preset[] presets { get; set; }
     }
 
     public sealed class Capability
     {
         public string name { get; set; }
-    }
-
-    public sealed class Outlet
-    {
-        public bool active { get; set; }
-        public int icon_index { get; set; }
-        public int position { get; set; }
     }
 
     public sealed class Preset
@@ -61,12 +56,17 @@
         public int timer_length { get; set; }
         public bool timer_sounds_alert { get; set; }
         public string title { get; set; }
-        public Outlet1[] outlets { get; set; }
+        public Outlet[] outlets { get; set; }
     }
 
-    public sealed class Outlet1
+    public class Outlet
     {
         public int position { get; set; }
         public bool active { get; set; }
+    }
+
+    public sealed class OutletIcon: Outlet
+    {
+        public int icon_index { get; set; }
     }
 }

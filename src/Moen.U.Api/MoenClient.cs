@@ -1,4 +1,5 @@
 ﻿using Moen.U.Api.Models;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -50,10 +51,71 @@ namespace Moen.U.Api
 
         public async Task<UserAuthentication> AuthenticateAsync(string email, string password, CancellationToken ct)
         {
-            this.Client.DefaultRequestHeaders.Accept.Clear();
-            this.Client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-            this.UserAuthentication = await this.GetAsync<UserAuthentication>($"/v2/authenticate?password={password}&email={email}", ct);
-            return this.UserAuthentication;
+            try
+            {
+                this.Client.DefaultRequestHeaders.Accept.Clear();
+                this.Client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+                this.UserAuthentication = await this.GetAsync<UserAuthentication>($"/v2/authenticate?password={password}&email={email}", ct);
+
+                return this.UserAuthentication;
+            }
+            finally
+            {
+                this.Client.DefaultRequestHeaders.Accept.Clear();
+            }
+        }
+
+        public async Task ForgotPasswordAsync(string email, CancellationToken ct)
+        {
+            using (var response = await this.PostAsync($"/v2/reset_tokens?language=0&email={email}", ct))
+            {
+                response.EnsureSuccessStatusCode();
+            }
+        }
+
+        public async Task ForgotPasswordAsync(string token, string newPassword, CancellationToken ct)
+        {
+            if (string.IsNullOrWhiteSpace(token))
+                throw new ArgumentNullException(nameof(token));
+            if (string.IsNullOrWhiteSpace(newPassword))
+                throw new ArgumentNullException(nameof(newPassword));
+
+            using (var response = await this.DeleteAsync($"/v2/reset_tokens/{token}?password={newPassword}", ct))
+            {
+                response.EnsureSuccessStatusCode();
+            }            
+        }
+
+        public async Task ChangeEmailAsync(UserAuthentication userAuthentication, string newEmail, string currentPassword, CancellationToken ct)
+        {
+            if (string.IsNullOrWhiteSpace(userAuthentication?.token))
+                throw new ArgumentNullException(nameof(userAuthentication.token));
+            if (string.IsNullOrWhiteSpace(newEmail))
+                throw new ArgumentNullException(nameof(newEmail));
+            if (string.IsNullOrWhiteSpace(currentPassword))
+                throw new ArgumentNullException(nameof(currentPassword));
+
+            var url = $"/v3/users/{userAuthentication.token}?user%5Bemail%5D={newEmail}&user%5Bcurrent_password%5D={currentPassword}";
+            using (var response = await this.PatchAsync(url, ct))
+            {
+                response.EnsureSuccessStatusCode();
+            }
+        }
+
+        public async Task ChangePasswordAsync(UserAuthentication userAuthentication, string currentPassword, string newPassword, CancellationToken ct)
+        {
+            if (string.IsNullOrWhiteSpace(userAuthentication?.token))
+                throw new ArgumentNullException(nameof(userAuthentication.token));
+            if (string.IsNullOrWhiteSpace(currentPassword))
+                throw new ArgumentNullException(nameof(currentPassword));
+            if (string.IsNullOrWhiteSpace(newPassword))
+                throw new ArgumentNullException(nameof(newPassword));
+
+            var url = $"/v3/users/{userAuthentication.token}?user%5Bcurrent_password%5D={currentPassword}&user%5Bpassword%5D={newPassword}";
+            using (var response = await this.PatchAsync(url, ct))
+            {
+                response.EnsureSuccessStatusCode();
+            }
         }
 
         #endregion
@@ -75,10 +137,42 @@ namespace Moen.U.Api
             return this.GetAsync<ShowerDetails>($"/v5/showers/{serialNumber}", ct);
         }
 
-        #endregion Showers
+        public ShowerDetailsUpdate GetShowerDetailsUpdate(ShowerDetails showerDetails)
+        {
+            if (showerDetails == null)
+                throw new ArgumentNullException(nameof(showerDetails));
+            if (string.IsNullOrWhiteSpace(showerDetails.serial_number))
+                throw new ArgumentNullException(nameof(showerDetails.serial_number));
 
+            var data = JsonConvert.DeserializeObject<ShowerDetailsUpdate>(JsonConvert.SerializeObject(showerDetails));
+            data.serial_number = showerDetails.serial_number;
+            return data;
+        }
 
-        public Task<PusherAuth> PusherAuth(ShowerDetails showerDetails, string socket_id, CancellationToken ct)
+        public async Task UpdateShowerDetailsAsync(ShowerDetailsUpdate showerDetailsUpdate, CancellationToken ct)
+        {
+            if (showerDetailsUpdate == null)
+                throw new ArgumentNullException(nameof(showerDetailsUpdate));
+            if (string.IsNullOrWhiteSpace(showerDetailsUpdate.serial_number))
+                throw new ArgumentNullException(nameof(showerDetailsUpdate.serial_number));
+
+            var url = $"/v4/showers/{showerDetailsUpdate.serial_number}";
+            var requestData = new ShowerDetailsUpdateRequest() { shower = showerDetailsUpdate };
+            var content = new StringContent(JsonConvert.SerializeObject(requestData));
+
+            this.SetHeaders();
+            using (var response = await this.PatchAsync(url, ct, content))
+            {
+                var c = await response.Content.ReadAsStringAsync();
+                response.EnsureSuccessStatusCode();
+            }
+        }
+
+        #endregion
+
+        #region Configuration
+
+        public Task<PusherAuth> PusherAuthAsync(ShowerDetails showerDetails, string socket_id, CancellationToken ct)
         {
             if (showerDetails == null)
                 throw new ArgumentNullException(nameof(showerDetails));
@@ -111,7 +205,9 @@ namespace Moen.U.Api
             return this.PostAsync($"/v2/capabilities?name={capability}", ct);
         }
 
-        #endregion Public
+        #endregion
+
+        #endregion
 
         #endregion Methods
     }
