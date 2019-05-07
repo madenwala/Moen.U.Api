@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using Xunit;
@@ -27,6 +28,7 @@ namespace Moen.U.Api.Tests
             }
             catch (Exception ex)
             {
+                Debug.WriteLine(ex.ToString());
                 Console.WriteLine(ex.ToString());
             }
         }
