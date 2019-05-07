@@ -89,7 +89,7 @@ namespace Moen.U.Api
         #region Put
 
         /// <summary>
-        /// Posts data to the specified URL.
+        /// Puts data to the specified URL.
         /// </summary>
         /// <typeparam name="T">Type for the strongly typed class representing data returned from the URL.</typeparam>
         /// <param name="url">URL to retrieve data from.</param>
@@ -106,7 +106,7 @@ namespace Moen.U.Api
         }
 
         /// <summary>
-        /// Post to specified URL.
+        /// Put to specified URL.
         /// </summary>
         /// <param name="url">URL to post data to.</param>
         /// <param name="ct">Cancellation token.</param>
@@ -226,23 +226,43 @@ namespace Moen.U.Api
 
         #region Logging
 
-        private void Log(string message)
+        private static Action<string> _log = new Action<string>((message) => Debug.WriteLine(message));
+
+        /// <summary>
+        /// Allows you to override where logging happens via an Action method that accepts string messages to log.
+        /// </summary>
+        /// <param name="loggingMethod">Action method that can except string messages.</param>
+        protected static void SetLogging(Action<string> loggingMethod)
         {
-            Debug.WriteLine($"{DateTime.Now.ToString()}\t{message}");
+            if (loggingMethod != null)
+                _log = loggingMethod;
         }
 
+        /// <summary>
+        /// Logs a message to the input log method.
+        /// </summary>
+        /// <param name="message">String to log</param>
+        private void Log(string message)
+        {
+            _log.Invoke($"{DateTime.Now.ToString()}\t{message}");
+        }
+
+        /// <summary>
+        /// Logs a <see cref="HttpResponseMessage" to the specified log./>
+        /// </summary>
+        /// <param name="response">Response message to log</param>
         private async void Log(HttpResponseMessage response)
         {
             var data = await response.Content?.ReadAsStringAsync();
-            Debug.WriteLine("********");
-            Debug.WriteLine(DateTime.Now.ToString());
-            Debug.WriteLine($"REQUEST   URL: {response.RequestMessage.RequestUri}");
+            _log.Invoke("********");
+            _log.Invoke(DateTime.Now.ToString());
+            _log.Invoke($"REQUEST   URL: {response.RequestMessage.RequestUri}");
             if(response.RequestMessage.Content != null)
-                Debug.WriteLine($"REQUEST   Content: {await response.RequestMessage.Content?.ReadAsStringAsync()}");
-            Debug.WriteLine($"RESPONSE  Code: {(int)response.StatusCode} ({response.StatusCode})");
+                _log.Invoke($"REQUEST   Content: {await response.RequestMessage.Content?.ReadAsStringAsync()}");
+            _log.Invoke($"RESPONSE  Code: {(int)response.StatusCode} ({response.StatusCode})");
             if(!string.IsNullOrEmpty(data))
-                Debug.WriteLine($"{data}");
-            Debug.WriteLine("********");
+                _log.Invoke($"{data}");
+            _log.Invoke("********");
         }
 
         #endregion
